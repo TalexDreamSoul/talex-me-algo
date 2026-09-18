@@ -76,6 +76,7 @@ async function runRecall(meta, notes) {
   console.log(`    坑      ${fmtPitfalls(notes.pitfalls)}`);
   console.log('');
 
+  console.log(c.gray('  0-2 没对上  3 想起来了但不确定  4 基本一致  5 完全一致'));
   const self = await promptRating(`  ${c.bold('对上了吗？')} [0-5] `);
   finish(meta, 'recall', self, { answers });
 }

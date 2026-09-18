@@ -70,8 +70,17 @@ export async function cmdSubmit(args) {
   // 自评优先级：命令行 --rating > notes.md 的 confidence > 问你。
   // notes.md 里已经写了 confidence 就别再问一遍——顺带逼着你先写笔记。
   const presetRating = args.rating ?? (notes.confidence > 0 ? notes.confidence : undefined);
+  if (presetRating === undefined) {
+    console.log('');
+    console.log(c.gray('  自评标准（决定下次什么时候再见到这题）'));
+    console.log(`    ${c.red('0-2')} 没做出来／看了题解才会  ${c.gray('→ 明天再来，间隔归零')}`);
+    console.log(`    ${c.yellow('3')}   做出来了但磕磕绊绊      ${c.gray('→ 间隔慢慢拉长')}`);
+    console.log(`    ${c.green('4')}   顺畅写出，小卡壳        ${c.gray('→ 间隔正常拉长')}`);
+    console.log(`    ${c.green('5')}   秒杀，闭眼都能写        ${c.gray('→ 间隔拉到最长')}`);
+    console.log('');
+  }
   const rating = await promptRating(
-    `  ${c.bold('自评掌握度')} ${c.gray('0=瞎蒙 5=秒杀')} [0-5] `,
+    `  ${c.bold('自评掌握度')} [0-5] `,
     presetRating,
   );
   if (presetRating !== undefined && args.rating === undefined) {
