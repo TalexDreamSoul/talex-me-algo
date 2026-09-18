@@ -88,13 +88,20 @@ export function parseArgLine(line) {
 
 /**
  * 把纯数据入参解码成解法函数真正需要的参数。
+ *
+ * 必须深拷贝：原地修改题（26、27、283…）会直接改写传进来的数组，
+ * 不拷贝的话 cases.json 里的 input 会被解法改掉，失败报告打印的
+ * 「输入」就是被污染后的样子——看着像判题器发疯，其实是自己改的。
+ * 对拍时暴力解和待测解也必须各拿一份，否则互相污染。
+ *
  * @param {unknown[]} rawArgs
  * @param {string[]} paramTypes
  */
 export function decodeArgs(rawArgs, paramTypes) {
   return rawArgs.map((v, i) => {
     const codec = nodeTypeOf(paramTypes[i]);
-    return codec ? codec.decode(v) : v;
+    // 链表/树的 decode 本身就在造新对象，无需再拷
+    return codec ? codec.decode(v) : structuredClone(v);
   });
 }
 

@@ -78,8 +78,10 @@ function clampLevel(raw) {
  * 汇总所有阶段，落库并返回结论。
  *
  * `ok` 只代表「没有判定为错的用例」，不代表判过。缺 oracle 的阶段里每条都是
- * ok===null——把它当通过就是自欺，所以额外返回 judged / missingOracle，
- * 让 submit 这类正式门禁能区分「真过了」和「只是没崩」。
+ * ok===null——把它当通过就是自欺，所以额外返回 judged / unjudged / unjudgedGenerated /
+ * missingOracle，让 submit 这类正式门禁能区分「真过了」和「只是没崩」。
+ * 门禁看的是 unjudgedGenerated（生成用例里 ok:null 的条数）：oracle 缺失、
+ * 还是骨架、还是自己崩了，都会在这里露出来。
  */
 function summarize(meta, stages, { level = 1, totalMs = 0 } = {}) {
   const all = stages.flatMap((s) => s.results);
@@ -87,12 +89,22 @@ function summarize(meta, stages, { level = 1, totalMs = 0 } = {}) {
   const failed = all.filter((r) => r.ok === false);
   const unjudged = all.filter((r) => r.ok === null);
   const missingOracle = stages.filter((s) => s.oracle === null).map((s) => s.stage);
+  // 生成用例（边界/随机）的判定依据只能是 oracle：那里出现 ok:null 就说明
+  // oracle 缺失或自己崩了。不能拿「没崩」当「对了」。
+  const unjudgedGenerated = stages
+    .filter((s) => s.generated)
+    .flatMap((s) => s.results)
+    .filter((r) => r.ok === null).length;
 
   recordRun({
     problemId: meta.id,
     // kind 记的是这次跑到哪一档，历史里能看出你是只跑样例还是真上了对拍
     kind: stages.some((s) => s.stage.startsWith('ACM')) ? 'acm' : `L${level}`,
     passed,
+    // judged 只算判过对错的：passed + 判错。剩下的 unjudged 是「没判过」——
+    // 分开记才能让聚合分析不把「没判过」当成「判错了」。
+    judged: passed + failed.length,
+    unjudged: unjudged.length,
     total: all.length,
     ms: totalMs,
     failure: failed.length ? failed.map((r) => r.name).join(', ') : null,
@@ -104,6 +116,7 @@ function summarize(meta, stages, { level = 1, totalMs = 0 } = {}) {
     total: all.length,
     judged: passed + failed.length,
     unjudged: unjudged.length,
+    unjudgedGenerated,
     missingOracle,
     level,
     stages,
@@ -229,6 +242,7 @@ function printStages(meta, stages, { level, totalMs }) {
 
   let anyFailed = false;
   let missingOracle = false;
+  let anyUnjudged = false;
 
   for (const st of stages) {
     const pass = st.results.filter((r) => r.ok === true).length;
@@ -236,8 +250,10 @@ function printStages(meta, stages, { level, totalMs }) {
     const skip = st.results.filter((r) => r.ok === null);
     if (fail.length) anyFailed = true;
     if (st.oracle === null) missingOracle = true;
+    if (skip.length) anyUnjudged = true;
 
-    const badge = fail.length ? c.red('✗') : skip.length ? c.yellow('?') : c.green('✓');
+    const badge =
+      fail.length ? c.red('✗') : skip.length || st.oracle === null ? c.yellow('?') : c.green('✓');
     const counts = [
       `${pass}/${st.results.length}`,
       fail.length ? c.red(`${fail.length} 失败`) : null,
@@ -247,7 +263,10 @@ function printStages(meta, stages, { level, totalMs }) {
       .join(' ');
 
     console.log('');
-    console.log(`  ${badge} ${c.bold(st.stage)}  ${counts}  ${c.gray(st.oracle ?? '缺 oracle')}`);
+    const oracleLabel = st.oracle ?? '缺 oracle';
+    console.log(
+      `  ${badge} ${c.bold(st.stage)}  ${counts}  ${c.gray(st.oracleNote ? `${oracleLabel} · ${st.oracleNote}` : oracleLabel)}`,
+    );
 
     // 失败详情最多展开 3 条，其余只报名字
     for (const r of fail.slice(0, 3)) {
@@ -274,10 +293,14 @@ function printStages(meta, stages, { level, totalMs }) {
   console.log('');
   if (anyFailed) {
     console.log(`  ${c.red('有失败')} ${c.gray(`${totalMs.toFixed(0)}ms`)}`);
-  } else if (missingOracle) {
+  } else if (missingOracle || anyUnjudged) {
     // 不能说「全过」——没有 oracle 的阶段一条都没判过对错
     console.log(`  ${c.yellow('没崩，但边界/随机用例未判定对错')} ${c.gray(`${totalMs.toFixed(0)}ms`)}`);
     console.log(c.gray('  写 tests/brute.js 的暴力解才能真对拍；或写 tests/invariant.js 断言性质。'));
+    const note = stages.find((s) => s.oracleNote)?.oracleNote;
+    console.log(
+      c.gray(note ? `  ${note}——删掉那行 throw，写出实现` : `  没有骨架先补：algo oracle ${meta.id}`),
+    );
   } else {
     console.log(`  ${c.green(`${LEVEL_LABEL[level]} 全过`)} ${c.gray(`${totalMs.toFixed(0)}ms`)}`);
     if (level < 3) {

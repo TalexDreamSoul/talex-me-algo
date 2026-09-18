@@ -8,6 +8,7 @@ import { c } from './lib/term.js';
 const COMMANDS = {
   new: { file: './commands/new.js', fn: 'cmdNew', help: '抓一道题，生成目录/题面/骨架/用例，并在 Cursor 里打开' },
   test: { file: './commands/test.js', fn: 'cmdTest', help: '分级自测（--level 1|2|3，默认 1）' },
+  oracle: { file: './commands/oracle.js', fn: 'cmdOracle', help: '补缺失的 tests/brute.js 骨架（L2/L3 的判定依据）' },
   submit: { file: './commands/submit.js', fn: 'cmdSubmit', help: '正式提交：跑满 L3 + 快照 + 排复习 + push' },
   list: { file: './commands/list.js', fn: 'cmdList', help: '列出路线题目及状态' },
   today: { file: './commands/list.js', fn: 'cmdToday', help: '今天该做什么：到期复习 + 下一批新题' },

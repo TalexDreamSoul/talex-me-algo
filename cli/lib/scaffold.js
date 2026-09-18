@@ -84,8 +84,7 @@ export async function scaffold(key, opts = {}) {
   fs.writeFileSync(path.join(dir, 'acm.js'), renderAcm(problem, plan));
 
   // brute.js 是 L2/L3 的判定依据，属于「你的思考过程」，绝不覆盖已有内容
-  const bruteFile = path.join(dir, 'tests', 'brute.js');
-  if (!fs.existsSync(bruteFile)) fs.writeFileSync(bruteFile, renderBrute(problem, plan));
+  ensureBruteSkeleton({ ...problem, dir });
 
   const notesFile = path.join(dir, 'notes.md');
   if (!fs.existsSync(notesFile)) fs.writeFileSync(notesFile, renderNotes(problem));
@@ -546,6 +545,26 @@ export function ${plan.name}(${plan.paramNames.join(', ')}) {
   throw new Error('暴力参考解还没写。写完 L2/L3 才能真判对错，否则只验证不崩溃。');
 }
 `;
+}
+
+/**
+ * 补 tests/brute.js 骨架（只补缺失，已存在的一律不动）。
+ *
+ * 这是 L2/L3 唯一的判定依据的入口，`algo new` 与 `algo oracle` 共用同一份模板，
+ * 避免两处各写一个版本后慢慢跑偏。
+ * 注意：骨架带 ALGO_BRUTE_NOT_WRITTEN 标记时，runner 依旧算「缺 oracle」——
+ * 补骨架只是把签名和提示放到该在的位置，解锁判定还得靠你真写出来。
+ *
+ * @param {any} meta 含 dir / leetcodeMeta 的 meta.json
+ * @returns {'created' | 'exists'}
+ */
+export function ensureBruteSkeleton(meta) {
+  const file = path.join(meta.dir, 'tests', 'brute.js');
+  if (fs.existsSync(file)) return 'exists';
+  ensureDir(path.join(meta.dir, 'tests'));
+  const plan = planFromMeta(meta.leetcodeMeta, meta.codec ?? {});
+  fs.writeFileSync(file, renderBrute(meta, plan));
+  return 'created';
 }
 
 function renderNotes(problem) {

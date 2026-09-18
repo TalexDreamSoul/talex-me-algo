@@ -122,6 +122,44 @@ export function cmdStats() {
     for (const f of failures) console.log(`    ${String(f.n).padStart(3)}×  ${c.gray(f.failure)}`);
   }
 
+  // 判题有效性：把「没判过」和「判错了」分开记。混在一起看，会把自己的退步
+  // 当成题目难，也会把没 oracle 的空跑当成通过。
+  const quality = db
+    .prepare(
+      `SELECT COUNT(*) n,
+              SUM(CASE WHEN unjudged > 0 THEN 1 ELSE 0 END) partial,
+              SUM(COALESCE(unjudged, 0)) skipped
+       FROM runs WHERE unjudged IS NOT NULL`,
+    )
+    .get();
+  const legacy = db.prepare('SELECT COUNT(*) n FROM runs WHERE unjudged IS NULL').get();
+  if (quality?.n) {
+    console.log('');
+    console.log(c.bold('  判题有效性') + c.gray('  （未判定 = 没有判定依据，只验证了没崩）'));
+    console.log('');
+    console.log(
+      `    ${String(quality.n).padStart(3)} 次有判定依据的记录，其中 ${c.yellow(`${quality.partial} 次带未判定用例`)}，共 ${quality.skipped} 条没判过对错`,
+    );
+    const needOracle = db
+      .prepare(
+        `SELECT r.problem_id id, p.title, SUM(r.unjudged) skipped
+         FROM runs r JOIN problems p ON p.id = r.problem_id
+         WHERE r.unjudged > 0
+         GROUP BY r.problem_id ORDER BY skipped DESC LIMIT 5`,
+      )
+      .all();
+    if (needOracle.length) {
+      console.log(c.gray('    没判过最多的题：'));
+      for (const r of needOracle) {
+        console.log(`      ${String(r.skipped).padStart(3)} 条  ${r.id}. ${r.title}`);
+      }
+    }
+    if (legacy?.n) console.log(c.gray(`    （另有 ${legacy.n} 次老记录没记这个字段，未统计）`));
+  } else if (legacy?.n) {
+    console.log('');
+    console.log(c.gray('  判题有效性：老记录没记「未判定」条数，跑一次 algo test 之后才有'));
+  }
+
   const dueSoon = db
     .prepare(`SELECT COUNT(*) n FROM reviews WHERE due_on <= date('now', '+7 day')`)
     .get();

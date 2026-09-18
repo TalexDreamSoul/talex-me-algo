@@ -44,7 +44,10 @@ function migrate(d) {
       passed      INTEGER NOT NULL,
       total       INTEGER NOT NULL,
       ms          REAL NOT NULL DEFAULT 0,
-      failure     TEXT
+      failure     TEXT,
+      -- 判过对错的条数 / 只验证了没崩的条数。老记录反推不出来，保持 NULL。
+      judged      INTEGER,
+      unjudged    INTEGER
     );
 
     CREATE TABLE IF NOT EXISTS attempts (
@@ -73,6 +76,17 @@ function migrate(d) {
       last_done    TEXT
     );
   `);
+
+  // 已有库补列：CREATE TABLE IF NOT EXISTS 不会改老表，而 sqlite 没有
+  // ADD COLUMN IF NOT EXISTS，只能查一次 PRAGMA。
+  addColumn(d, 'runs', 'judged', 'INTEGER');
+  addColumn(d, 'runs', 'unjudged', 'INTEGER');
+}
+
+function addColumn(d, table, column, type) {
+  const cols = d.prepare(`PRAGMA table_info(${table})`).all();
+  if (cols.some((c) => c.name === column)) return;
+  d.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`);
 }
 
 /** 把 meta.json 同步进 db（幂等） */
@@ -100,13 +114,13 @@ export function upsertProblem(meta) {
   );
 }
 
-export function recordRun({ problemId, kind, passed, total, ms, failure }) {
+export function recordRun({ problemId, kind, passed, total, ms, failure, judged = null, unjudged = null }) {
   getDb()
     .prepare(
-      `INSERT INTO runs (problem_id, ran_at, kind, passed, total, ms, failure)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO runs (problem_id, ran_at, kind, passed, total, ms, failure, judged, unjudged)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
-    .run(problemId, new Date().toISOString(), kind, passed, total, ms, failure ?? null);
+    .run(problemId, new Date().toISOString(), kind, passed, total, ms, failure ?? null, judged, unjudged);
 }
 
 export function recordAttempt(a) {

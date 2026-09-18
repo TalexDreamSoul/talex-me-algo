@@ -33,14 +33,28 @@ export async function cmdSubmit(args) {
       console.log(c.red('  全量自测没过。确定要记为完成就加 --skip-test。'));
       return;
     }
-    // ok 只说明「没有判错的」。缺 oracle 的阶段一条都没判过对错，
-    // 放行等于把 L3 降级成 L1——那分级自测就白做了。
-    if (verdict.missingOracle.length) {
+    // ok 只说明「没有判错的」。未判定的用例一条都没判过对错，放行等于把 L3
+    // 降级成 L1——那分级自测就白做了。两种情况都要拦：整阶段缺 oracle（oracle 为
+    // null），以及生成用例里出现 ok:null（oracle 是骨架，或者 brute 自己崩了）。
+    const unjudgedGenerated = verdict.unjudgedGenerated;
+    if (verdict.missingOracle.length || unjudgedGenerated > 0) {
       console.log('');
-      console.log(c.red(`  ${verdict.unjudged} 条用例未判定对错，不能算正式通过。`));
-      console.log(c.gray(`  缺 oracle 的阶段：${verdict.missingOracle.join('、')}`));
+      console.log(
+        c.red(
+          unjudgedGenerated
+            ? `  ${unjudgedGenerated} 条生成用例未判定对错，不能算正式通过。`
+            : '  边界/随机用例一条都没判过对错，不能算正式通过。',
+        ),
+      );
+      if (verdict.missingOracle.length) {
+        console.log(c.gray(`  缺 oracle 的阶段：${verdict.missingOracle.join('、')}`));
+      }
       console.log('');
       console.log(`  写 ${c.bold('tests/brute.js')} 的暴力参考解，L2/L3 才有判定依据。`);
+      const note = verdict.stages?.find((s) => s.oracleNote)?.oracleNote;
+      console.log(
+        c.gray(note ? `  ${note}——删掉那行 throw，写出实现` : `  没有骨架先补：algo oracle ${meta.id}`),
+      );
       console.log(c.gray('  答案不唯一的题改写 tests/invariant.js 断言性质。'));
       console.log(c.gray('  就是要跳过：algo submit --skip-test。'));
       console.log('');

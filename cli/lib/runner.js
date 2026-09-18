@@ -207,12 +207,18 @@ export async function runLevels(meta, caseFile, opts = {}) {
   }
 
   const checker = await loadChecker(meta);
-  const brute = await loadOptional(meta.dir, 'brute.js', meta.entry);
-  const invariant = await loadOptional(meta.dir, 'invariant.js', 'check');
+  const { fn: brute, stub: bruteStub } = await loadOptional(meta.dir, 'brute.js', meta.entry);
+  const { fn: invariant, stub: invStub } = await loadOptional(meta.dir, 'invariant.js', 'check');
   const cons = caseFile.constraints ?? null;
   const flags = cons?.flags ?? [];
 
-  /** @type {{stage: string, results: any[], oracle: string}[]} */
+  /** 有骨架但没写实现时要说清楚「差什么」，否则容易以为是判题器坏了 */
+  const oracleNote =
+    !brute && !invariant && (bruteStub || invStub)
+      ? `${bruteStub ? 'tests/brute.js' : 'tests/invariant.js'} 还是骨架，没写实现`
+      : null;
+
+  /** @type {{stage: string, results: any[], oracle: string, generated?: boolean, oracleNote?: string|null}[]} */
   const stages = [];
 
   // ── L1：官方样例 ─────────────────────────────────────────
@@ -224,7 +230,9 @@ export async function runLevels(meta, caseFile, opts = {}) {
   const bounds = boundaryCases(plan, cons, flags);
   stages.push({
     stage: '边界用例',
+    generated: true,
     oracle: brute ? '对拍 brute.js' : invariant ? '性质断言 invariant.js' : null,
+    oracleNote,
     results: await judgeGenerated(entry, plan, meta, bounds, { brute, invariant, checker, timeoutMs }),
   });
   if (level < 3) return { stages, plan };
@@ -236,7 +244,9 @@ export async function runLevels(meta, caseFile, opts = {}) {
   });
   stages.push({
     stage: '随机对拍',
+    generated: true,
     oracle: brute ? '对拍 brute.js' : invariant ? '性质断言 invariant.js' : null,
+    oracleNote,
     results: await judgeGenerated(entry, plan, meta, randoms, { brute, invariant, checker, timeoutMs }),
   });
 
@@ -251,18 +261,28 @@ export async function runLevels(meta, caseFile, opts = {}) {
   return { stages, plan };
 }
 
-/** 可选的 oracle 模块：不存在就返回 null，不是错误 */
+/** 骨架标记：模板里那行注释，写完实现才删 */
+const STUB_MARK = /ALGO_BRUTE_NOT_WRITTEN/;
+
+/**
+ * 可选的 oracle 模块：不存在、或还停在骨架上，都算「没有 oracle」。
+ *
+ * 判定必须和 `algo oracle` 认定骨架的口径一致。骨架被当成真 oracle 时，生成用例
+ * 全是 ok:null，而 submit 的门禁只看 oracle 是否为 null——会直接放行。
+ * 所以读源文件而不是 fn.toString()：Bun 的 toString() 返回转译结果，注释被剥掉、
+ * 中文被转成 \uXXXX，拿它做匹配只会得出「骨架是真 oracle」。
+ *
+ * @returns {Promise<{ fn: Function|null, stub: boolean }>}
+ */
 async function loadOptional(dir, file, exportName) {
   const p = path.join(dir, 'tests', file);
-  if (!fs.existsSync(p)) return null;
+  if (!fs.existsSync(p)) return { fn: null, stub: false };
+  const stub = STUB_MARK.test(fs.readFileSync(p, 'utf8'));
   const mod = await import(`${pathToFileURL(p).href}?t=${Date.now()}`);
   const fn = mod[exportName] ?? mod.default;
-  if (typeof fn !== 'function') return null;
-  // 脚手架生成的骨架一调就抛，那等于没有 oracle——必须识破，
-  // 否则会给出「对拍通过」的假信号。
-  // 用 ASCII 标记判断：Bun 的 toString() 会把中文转成 \uXXXX 转义，中文正则匹配不到。
-  if (fn.__ALGO_STUB__ === true || /ALGO_BRUTE_NOT_WRITTEN/.test(fn.toString())) return null;
-  return fn;
+  if (typeof fn !== 'function') return { fn: null, stub: false };
+  if (fn.__ALGO_STUB__ === true || stub) return { fn: null, stub };
+  return { fn, stub: false };
 }
 
 /**
@@ -290,8 +310,7 @@ async function judgeGenerated(entry, plan, meta, cases, { brute, invariant, chec
     if (brute) {
       let expected;
       try {
-        // 暴力解吃的是同一份原始入参，需各自解码，避免原地修改题互相污染
-        expected = execOne(brute, plan, structuredClone(c.input), meta);
+        expected = execOne(brute, plan, c.input, meta);
       } catch (err) {
         results.push({ ...base, ok: null, actual, reason: `brute.js 自己崩了：${err.message}` });
         continue;
