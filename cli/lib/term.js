@@ -61,13 +61,104 @@ function hasPipedStdin() {
  *
  * 单独抽出来是因为 Number('') === 0——直接回车会被静默当成「自评 0 分」，
  * 而 0 分会把复习间隔打回 1 天。自评是 SRS 的唯一输入，不能猜。
+ *
+ * 不给 preset 时走单键倒计时：按 0-5 立刻生效，不用回车；
+ * 干等超时就用 fallback，避免提交流程停在这儿不动。
  */
-export async function promptRating(question, preset) {
-  const raw = preset ?? (await prompt(question));
-  if (String(raw).trim() === '') throw new Error('得给个 0-5 的自评，不能空着');
-  const n = Number(raw);
-  if (!Number.isInteger(n) || n < 0 || n > 5) throw new Error('自评必须是 0-5 的整数');
-  return n;
+export async function promptRating(question, preset, opts = {}) {
+  if (preset !== undefined) {
+    if (String(preset).trim() === '') throw new Error('得给个 0-5 的自评，不能空着');
+    const n = Number(preset);
+    if (!Number.isInteger(n) || n < 0 || n > 5) throw new Error('自评必须是 0-5 的整数');
+    return n;
+  }
+  const fallback = opts.fallback ?? 5;
+  const timeoutMs = opts.timeoutMs ?? 15000;
+
+  if (!process.stdin.isTTY) {
+    // 没终端就别装作在问：管道/文件里读一行，真没有就用默认值
+    if (hasPipedStdin()) {
+      const line = (await prompt(question)).trim();
+      if (line === '') throw new Error('得给个 0-5 的自评，不能空着');
+      const n = Number(line);
+      if (!Number.isInteger(n) || n < 0 || n > 5) throw new Error('自评必须是 0-5 的整数');
+      return n;
+    }
+    console.log(c.yellow(`  读不到键盘输入，自评按 ${fallback} 记。要准确就加 --rating。`));
+    return fallback;
+  }
+
+  const picked = await readKeyWithCountdown(question, {
+    valid: '012345',
+    timeoutMs,
+    fallback: String(fallback),
+  });
+  return Number(picked);
+}
+
+/**
+ * 单键选择 + 倒计时。按下有效键立刻返回；任意键都会取消倒计时，
+ * 免得你正在想的时候被超时抢答。
+ */
+async function readKeyWithCountdown(question, { valid, timeoutMs, fallback }) {
+  const stdin = process.stdin;
+  const deadline = Date.now() + timeoutMs;
+  let counting = true;
+
+  const render = () => {
+    const left = Math.ceil((deadline - Date.now()) / 1000);
+    const hint = counting ? c.gray(`(${left}s 后按 ${fallback} 记) `) : '';
+    process.stdout.write(`\r\x1b[2K${question}${hint}`);
+  };
+
+  render();
+  const ticker = setInterval(render, 250);
+
+  stdin.setRawMode(true);
+  stdin.resume();
+
+  try {
+    return await new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        if (!counting) return;
+        finish(fallback, c.gray(`${fallback}（超时默认）`));
+      }, timeoutMs);
+
+      const onData = (buf) => {
+        const ch = buf.toString();
+        if (ch === '\u0003') {
+          cleanup();
+          reject(new Error('已取消'));
+          return;
+        }
+        // 开始打字就别再倒计时了，想多久想多久
+        if (counting) {
+          counting = false;
+          clearTimeout(timer);
+          render();
+        }
+        if (valid.includes(ch)) finish(ch, ch);
+      };
+
+      function finish(value, echo) {
+        cleanup();
+        process.stdout.write(`\r\x1b[2K${question}${echo}\n`);
+        resolve(value);
+      }
+
+      function cleanup() {
+        clearTimeout(timer);
+        clearInterval(ticker);
+        stdin.off('data', onData);
+      }
+
+      stdin.on('data', onData);
+    });
+  } finally {
+    clearInterval(ticker);
+    stdin.setRawMode(false);
+    stdin.pause();
+  }
 }
 
 async function* readLines() {

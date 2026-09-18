@@ -71,7 +71,7 @@ export async function cmdSubmit(args) {
   // notes.md 里已经写了 confidence 就别再问一遍——顺带逼着你先写笔记。
   const presetRating = args.rating ?? (notes.confidence > 0 ? notes.confidence : undefined);
   const rating = await promptRating(
-    `${c.bold('自评掌握度')} ${c.gray('0=瞎蒙 5=秒杀')} [0-5] `,
+    `  ${c.bold('自评掌握度')} ${c.gray('0=瞎蒙 5=秒杀')} [0-5] `,
     presetRating,
   );
   if (presetRating !== undefined && args.rating === undefined) {

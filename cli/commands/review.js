@@ -187,10 +187,6 @@ function fmtPitfalls(p) {
 }
 
 function finish(meta, mode, quality, extra) {
-  if (Number.isNaN(quality) || quality < 0 || quality > 5) {
-    console.log(c.yellow('  没给有效评分，这次不计入排期。'));
-    return;
-  }
   // 复用 submit 的排期逻辑，但不产生代码快照
   import('../lib/srs.js').then(({ schedule }) => {
     const srs = schedule({ problemId: meta.id, difficulty: meta.difficulty, mode, quality });
