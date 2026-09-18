@@ -1,0 +1,13 @@
+node_modules/
+web-dist/
+
+# sqlite 是派生数据：状态/掌握度/复习日期都在各题 meta.json 里，
+# algo sync 能从磁盘完整重建。二进制文件进 git 每次都是整文件 diff，不值当。
+data/algo.db
+data/algo.db-shm
+data/algo.db-wal
+
+# 复习「重写」模式掏空 solution.js 前的临时备份，不是成果
+problems/**/attempts/.before-*.js
+
+.DS_Store

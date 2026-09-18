@@ -1,0 +1,57 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "算法：本地判题",
+      "type": "shell",
+      "command": "bun cli/index.js test ${fileDirname}",
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated", "clear": true },
+      "group": { "kind": "build", "isDefault": true }
+    },
+    {
+      "label": "算法：判题（ACM 模式）",
+      "type": "shell",
+      "command": "bun cli/index.js test ${fileDirname} --acm",
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated", "clear": true }
+    },
+    {
+      "label": "算法：记为完成",
+      "type": "shell",
+      "command": "bun cli/index.js submit ${fileDirname}",
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated", "clear": true }
+    },
+    {
+      "label": "算法：今天做什么",
+      "type": "shell",
+      "command": "bun cli/index.js today",
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated", "clear": true }
+    },
+    {
+      "label": "算法：新建题目",
+      "type": "shell",
+      "command": "bun cli/index.js new ${input:problemId}",
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated", "clear": true }
+    },
+    {
+      "label": "算法：打开看板",
+      "type": "shell",
+      "command": "bun cli/index.js web",
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated" }
+    }
+  ],
+  "inputs": [
+    {
+      "id": "problemId",
+      "type": "promptString",
+      "description": "力扣题号或 slug",
+      "default": ""
+    }
+  ]
+}
