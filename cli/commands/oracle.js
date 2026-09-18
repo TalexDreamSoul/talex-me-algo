@@ -25,44 +25,56 @@ export function cmdOracle(args) {
   if (!targets.length) throw new Error('还没有任何题目。先跑 algo new <题号>。');
 
   const created = [];
+  const refreshed = [];
   const pending = [];
   const done = [];
 
   for (const meta of targets) {
-    if (ensureBruteSkeleton(meta) === 'created') {
+    const state = ensureBruteSkeleton(meta);
+    if (state === 'created') {
       created.push(meta);
+      continue;
+    }
+    if (state === 'refreshed') {
+      refreshed.push(meta);
       continue;
     }
     const text = fs.readFileSync(path.join(meta.dir, 'tests', 'brute.js'), 'utf8');
     (STUB_MARK.test(text) ? pending : done).push(meta);
   }
 
+  const skeletons = [...created, ...refreshed];
+  const head = (list, label) => {
+    console.log(`  ${label}`);
+    for (const m of list) console.log(`    ${c.cyan(String(m.id).padEnd(4))} ${m.title}`);
+  };
+
   console.log('');
-  if (created.length) {
-    console.log(`  ${c.green(`补了 ${created.length} 个骨架`)} ${c.gray('tests/brute.js')}`);
-    for (const m of created) console.log(`    ${c.cyan(String(m.id).padEnd(4))} ${m.title}`);
+  if (created.length) head(created, c.green(`补了 ${created.length} 个骨架`) + c.gray(' tests/brute.js'));
+  if (refreshed.length) {
+    if (created.length) console.log('');
+    head(refreshed, c.green(`刷新了 ${refreshed.length} 个旧骨架`) + c.gray(' 老模板写的，签名/说明已更新'));
   }
   if (pending.length) {
-    if (created.length) console.log('');
-    console.log(`  ${c.yellow(`${pending.length} 道骨架还没写实现`)}`);
-    for (const m of pending) console.log(`    ${c.cyan(String(m.id).padEnd(4))} ${m.title}`);
+    if (created.length || refreshed.length) console.log('');
+    head(pending, c.yellow(`${pending.length} 道骨架还没写实现`));
   }
   if (done.length) {
-    if (created.length || pending.length) console.log('');
-    console.log(`  ${c.gray(`${done.length} 道已有对拍实现`)}`);
+    if (created.length || refreshed.length || pending.length) console.log('');
+    head(done, c.gray(`${done.length} 道已有对拍实现`));
   }
-  if (!created.length && !pending.length) {
+  if (!skeletons.length && !pending.length) {
     console.log(`  ${c.green('全都有对拍实现了')} ${c.gray('没什么要补的')}`);
   }
 
-  if (created.length || pending.length) {
+  if (skeletons.length || pending.length) {
     console.log('');
     console.log(
       c.gray('  骨架不等于答案：带 ALGO_BRUTE_NOT_WRITTEN 标记的 brute.js 判题器仍算「缺 oracle」，'),
     );
     console.log(c.gray('  L2/L3 只会验证不崩。删掉那行 throw、写出「慢但显然正确」的实现，对拍才真判对错。'));
     console.log(c.gray('  答案不唯一的题改写 tests/invariant.js 断言性质。'));
-    const next = [...created, ...pending][0];
+    const next = [...skeletons, ...pending][0];
     console.log('');
     console.log(c.gray(`  下一步：${c.cyan(`algo test ${next.id} --level 2`)}`));
   }

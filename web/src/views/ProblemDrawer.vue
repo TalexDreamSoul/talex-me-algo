@@ -82,6 +82,21 @@ function onNotesKeydown(e) {
 }
 
 const lastRuns = computed(() => detail.value?.runs?.slice(0, 10) ?? []);
+
+// 未判定的用例（没 oracle、或 brute 是骨架）既不是通过也不是失败。
+// 老记录没这个字段（unjudged 为 null），只能退回原来的 passed/total 判断。
+function runFailed(r) {
+  return r.total - r.passed - (r.unjudged ?? 0);
+}
+function runTitle(r) {
+  const base = `判题 ${r.passed}/${r.total}`;
+  return r.unjudged ? `${base} · ${r.unjudged} 未判定` : base;
+}
+function runColor(r) {
+  if (runFailed(r) > 0) return 'error';
+  if (r.unjudged) return 'warning';
+  return r.passed === r.total ? 'primary' : 'error';
+}
 </script>
 
 <template>
@@ -203,9 +218,9 @@ const lastRuns = computed(() => detail.value?.runs?.slice(0, 10) ?? []);
             <TxTimelineItem
               v-for="r in lastRuns"
               :key="`r${r.id}`"
-              :title="`判题 ${r.passed}/${r.total}`"
+              :title="runTitle(r)"
               :time="r.ran_at.slice(0, 16).replace('T', ' ')"
-              :color="r.passed === r.total ? 'primary' : 'error'"
+              :color="runColor(r)"
             >
               {{ r.kind === 'acm' ? 'ACM 模式' : '函数模式' }}{{ r.failure ? ` · ${r.failure}` : '' }}
             </TxTimelineItem>

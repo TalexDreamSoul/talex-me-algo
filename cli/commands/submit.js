@@ -11,7 +11,7 @@ import {
   lastAttempt,
 } from '../lib/db.js';
 import { schedule } from '../lib/srs.js';
-import { c, prompt } from '../lib/term.js';
+import { c, promptRating } from '../lib/term.js';
 import { archiveProblem } from '../lib/git.js';
 
 /**
@@ -67,11 +67,15 @@ export async function cmdSubmit(args) {
   const sha = crypto.createHash('sha256').update(code).digest('hex').slice(0, 12);
 
   const notes = readNotes(meta.dir);
-  const rating = Number(
-    args.rating ?? (await prompt(`${c.bold('自评掌握度')} ${c.gray('0=瞎蒙 5=秒杀')} [0-5] `)),
+  // 自评优先级：命令行 --rating > notes.md 的 confidence > 问你。
+  // notes.md 里已经写了 confidence 就别再问一遍——顺带逼着你先写笔记。
+  const presetRating = args.rating ?? (notes.confidence > 0 ? notes.confidence : undefined);
+  const rating = await promptRating(
+    `${c.bold('自评掌握度')} ${c.gray('0=瞎蒙 5=秒杀')} [0-5] `,
+    presetRating,
   );
-  if (!Number.isInteger(rating) || rating < 0 || rating > 5) {
-    throw new Error('掌握度必须是 0-5 的整数');
+  if (presetRating !== undefined && args.rating === undefined) {
+    console.log(c.gray(`  自评 ${rating}/5（取自 notes.md 的 confidence）`));
   }
   const minutes = args.minutes ? Number(args.minutes) : null;
 

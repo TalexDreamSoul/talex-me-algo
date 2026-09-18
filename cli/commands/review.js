@@ -5,7 +5,7 @@ import { nextMode } from '../lib/srs.js';
 import { resolveProblem, todayISO } from '../lib/paths.js';
 import { readNotes } from './submit.js';
 import { openInCursor } from '../lib/editor.js';
-import { c, prompt } from '../lib/term.js';
+import { c, prompt, promptRating } from '../lib/term.js';
 
 /**
  * algo review [题号] [--mode recall|rewrite|variant]
@@ -76,7 +76,7 @@ async function runRecall(meta, notes) {
   console.log(`    坑      ${fmtPitfalls(notes.pitfalls)}`);
   console.log('');
 
-  const self = Number(await prompt(`  ${c.bold('对上了吗？')} [0-5] `));
+  const self = await promptRating(`  ${c.bold('对上了吗？')} [0-5] `);
   finish(meta, 'recall', self, { answers });
 }
 

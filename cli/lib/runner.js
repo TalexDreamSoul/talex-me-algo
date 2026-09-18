@@ -280,7 +280,9 @@ async function loadOptional(dir, file, exportName) {
   const stub = STUB_MARK.test(fs.readFileSync(p, 'utf8'));
   const mod = await import(`${pathToFileURL(p).href}?t=${Date.now()}`);
   const fn = mod[exportName] ?? mod.default;
-  if (typeof fn !== 'function') return { fn: null, stub: false };
+  // 没导出东西也可能是骨架（设计题的骨架只有注释），所以 stub 照常上报，
+  // 让调用方能说清「差什么」而不是只报「缺 oracle」。
+  if (typeof fn !== 'function') return { fn: null, stub };
   if (fn.__ALGO_STUB__ === true || stub) return { fn: null, stub };
   return { fn, stub: false };
 }

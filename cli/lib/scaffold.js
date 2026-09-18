@@ -508,6 +508,12 @@ for (let i = 0; i + PARAM_TYPES.length <= lines.length; i += PARAM_TYPES.length)
  * 实现来对拍。写它的收益不只是测试——能不能写出暴力解，本身就是你是否真读懂题的检验。
  * 没写就跑 L2/L3，只会验证「没崩」，不会验证「对不对」。
  */
+/** 骨架标记：模板里那行注释，写完实现要删掉。runner 认同一套约定 */
+const BRUTE_STUB_MARK = /ALGO_BRUTE_NOT_WRITTEN/;
+
+/** 行首的 export 才算真导出（注释里的不算） */
+const HAS_EXPORT = /^\s*export\b/m;
+
 function renderBrute(problem, plan) {
   if (plan.kind === 'design') {
     return `/**
@@ -520,6 +526,7 @@ function renderBrute(problem, plan) {
  */
 
 // export class ${plan.classname} { ... }
+// ALGO_BRUTE_NOT_WRITTEN —— 这行标记告诉判题器「还没写」，写好实现后删掉它
 `;
   }
   return `/**
@@ -548,23 +555,35 @@ export function ${plan.name}(${plan.paramNames.join(', ')}) {
 }
 
 /**
- * 补 tests/brute.js 骨架（只补缺失，已存在的一律不动）。
+ * 补 tests/brute.js 骨架，并刷新「还认得出是骨架」的旧文件。
  *
- * 这是 L2/L3 唯一的判定依据的入口，`algo new` 与 `algo oracle` 共用同一份模板，
+ * 重写条件只有两个，都是为了不碰你写的实现：
+ *   1. 带 ALGO_BRUTE_NOT_WRITTEN 标记——模板约定写完实现要删掉它；
+ *   2. 整个文件没有任何 export——设计题的骨架只有注释，本来就导不出东西。
+ * 真写了实现一定会导出 entry（runner 就是这么加载的），那种文件一个字节都不动。
+ *
+ * 这是 L2/L3 唯一判定依据的入口，`algo new` 与 `algo oracle` 共用同一份模板，
  * 避免两处各写一个版本后慢慢跑偏。
- * 注意：骨架带 ALGO_BRUTE_NOT_WRITTEN 标记时，runner 依旧算「缺 oracle」——
- * 补骨架只是把签名和提示放到该在的位置，解锁判定还得靠你真写出来。
  *
  * @param {any} meta 含 dir / leetcodeMeta 的 meta.json
- * @returns {'created' | 'exists'}
+ * @returns {'created' | 'refreshed' | 'exists'}
  */
 export function ensureBruteSkeleton(meta) {
   const file = path.join(meta.dir, 'tests', 'brute.js');
-  if (fs.existsSync(file)) return 'exists';
   ensureDir(path.join(meta.dir, 'tests'));
   const plan = planFromMeta(meta.leetcodeMeta, meta.codec ?? {});
-  fs.writeFileSync(file, renderBrute(meta, plan));
-  return 'created';
+  const body = renderBrute(meta, plan);
+  if (!fs.existsSync(file)) {
+    fs.writeFileSync(file, body);
+    return 'created';
+  }
+  const text = fs.readFileSync(file, 'utf8');
+  // 必须看「行首的 export」：设计题的骨架里 `// export class X { ... }` 是注释，
+  // 用 \bexport\b 会把注释当成真导出，于是骨架被判成已有实现。
+  if (!BRUTE_STUB_MARK.test(text) && HAS_EXPORT.test(text)) return 'exists';
+  if (text === body) return 'exists';
+  fs.writeFileSync(file, body);
+  return 'refreshed';
 }
 
 function renderNotes(problem) {
