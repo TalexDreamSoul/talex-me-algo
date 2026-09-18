@@ -72,7 +72,9 @@ export async function promptRating(question, preset, opts = {}) {
     if (!Number.isInteger(n) || n < 0 || n > 5) throw new Error('自评必须是 0-5 的整数');
     return n;
   }
-  const fallback = opts.fallback ?? 5;
+  // 超时默认取最低分：沉默意味着「人不在」，不是「秒杀了」。
+  // 记 0 只是让这题明天再出现一次，代价最小；记高分会让它消失几十天。
+  const fallback = opts.fallback ?? 0;
   const timeoutMs = opts.timeoutMs ?? 15000;
 
   if (!process.stdin.isTTY) {
