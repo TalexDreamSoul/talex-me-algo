@@ -1,30 +1,73 @@
 # talex-me-algo
 
-个人算法刷题工作台。labuladong 速成路线驱动 + 力扣抓题 + 本地判题 + 间隔复习 + 聚合看板。
+个人算法刷题工作台。labuladong 速成路线驱动 + 力扣抓题 + 分级自测 + 间隔复习 + 聚合看板。
 解法一律 **JavaScript**，写完可原样粘贴到力扣提交。
+每次正式提交自动 commit + push 到 GitHub private 仓库。
 
 ## 日常流程
 
 ```bash
-bun cli/index.js today          # 今天做什么：到期复习 + 路线上的下一批新题
-bun cli/index.js new 3          # 抓题、建目录、生成骨架和用例，并在 Cursor 里定位光标
+algo today                  # 今天做什么：到期复习 + 路线上的下一批新题
+algo new 26                 # 抓题、建目录、生成骨架和用例，并在 Cursor 里定位光标
 #  ...写代码...
-bun cli/index.js test 3         # 本地判题
-bun cli/index.js test 3 --acm   # 走真实 stdin/stdout（笔试模式）
+algo test 26                # L1 自测：官方样例
+algo test 26 --level 2      # L2：加边界用例
+algo test 26 --level 3      # L3：加随机对拍 + 性能门槛
 #  ...去力扣提交...
-bun cli/index.js submit 3       # 记为完成：快照代码 + 按 SM-2 排下次复习
-bun cli/index.js web            # 打开看板
+algo submit 26              # 正式提交：默认跑满 L3，快照代码，排复习，commit + push
+algo web                    # 打开看板
 ```
 
-建议做个 alias：`alias algo='bun ~/Workspace/Projects/talex-me-algo/cli/index.js'`。
+建议做个 alias：`alias algo='bun ~/Workspace/Projects/talex-me-algo/cli/index.js'`，
+或直接软链到 PATH：`ln -sf "$PWD/cli/index.js" ~/.bun/bin/algo`。
+
+## 自测 vs 正式提交
+
+**自测**（`algo test`）分三档，越往上越严：
+
+| 档 | 跑什么 | 判定依据 | 什么时候用 |
+|---|---|---|---|
+| **L1** | 官方样例 | 力扣题面 | 写完第一遍，确认思路没跑偏 |
+| **L2** | + 边界用例 | `tests/brute.js` 对拍 | 官方样例过了，查空/单元素/全同/极值 |
+| **L3** | + 随机对拍 + 性能门槛 | `tests/brute.js` 对拍 | 提交前的最后一道关 |
+
+**正式提交**（`algo submit`）= 「我在力扣上过了」。默认**跑满 L3** 才让过，
+然后快照代码、排下次复习、commit + push。想跳过加 `--skip-test`，想降档加 `--level 2`。
+
+### L2/L3 需要你写 `tests/brute.js`
+
+边界和随机用例**没有官方答案**，必须有独立的判定依据，否则只能验证「没崩」。
+每道题的 `tests/brute.js` 是一个**慢但显然正确**的实现，用来和你的解法对拍：
+
+```js
+// 26 题的暴力解：Set 去重再排序，O(n log n)，一眼就知道对
+export function removeDuplicates(nums) {
+  const uniq = [...new Set(nums)].sort((a, b) => a - b);
+  for (let i = 0; i < uniq.length; i++) nums[i] = uniq[i];
+  return uniq.length;
+}
+```
+
+没写的话 L2/L3 会明说「缺 oracle，只验证了不崩溃」，**不会假装通过**。
+
+答案不唯一的题（「返回任意一个合法解」）改写 `tests/invariant.js`，
+导出 `check(actual, input)` 断言性质而不是比对具体值。
+
+### 输入是按题面约束生成的
+
+建题时会解析题面「提示」里的数据范围（`1 <= nums.length <= 3 * 10^4`、
+`-100 <= nums[i] <= 100`、「已按非递减顺序排列」），存进 `tests/cases.json` 的 `constraints`。
+生成的用例都落在合法范围内 —— 给只接受正数的题喂负数，跑出来的失败是假失败。
+
+随机用例带 `seed`，失败时会打出来，原样重跑可复现。
 
 ## 命令
 
 | 命令 | 作用 |
 |---|---|
 | `new <题号\|slug>` | 抓题并生成完整题目目录。`--topic` 指定分类，`--force` 覆盖重建，`--no-open` 不开编辑器 |
-| `test [题号\|路径]` | 本地判题。`--acm` 走子进程 I/O，`--case 1,3` 只跑指定用例，`--yes` 跳过期望值确认 |
-| `submit [题号]` | 记为完成。`--rating 0-5` 自评，`--minutes` 用时，`--mode first\|rewrite\|variant` |
+| `test [题号\|路径]` | 分级自测。`--level 1\|2\|3`、`--acm` 走子进程 I/O、`--case 1,3` 只跑指定用例、`--seed` 固定随机种子、`--count` 随机用例数、`--yes` 跳过期望值确认 |
+| `submit [题号]` | 正式提交。默认跑满 L3。`--rating 0-5` 自评、`--minutes` 用时、`--mode first\|rewrite\|variant`、`--level` 降档、`--skip-test` 跳过、`--no-git` 不提交 |
 | `today` | 到期复习 + 路线上接下来的新题 |
 | `list` | 路线题目及状态。`--topic`、`--status`、`--todo`、`--limit` |
 | `review [题号]` | 复习。`--mode recall\|rewrite\|variant` |
@@ -32,9 +75,45 @@ bun cli/index.js web            # 打开看板
 | `open <题号>` | 默认在 Cursor 里打开解法。`--doc` 浏览器看题面、`--readme`、`--notes`、`--leetcode` |
 | `web` | 本地看板（可写）。`--port`、`--build`、`--no-open` |
 | `sync` | 把磁盘上的 meta.json 重新灌进 sqlite |
+| `git-setup` | 建 GitHub private 仓库并接上自动提交 |
+| `push` | 补推积压的本地 commit |
 
 `test` / `submit` 的题目参数可以是题号、slug、目录名，也可以是题目目录或其中任意文件的路径 ——
-所以在 Cursor 里对着 `solution.js` 按 `⌘⇧B` 就能直接判当前这题。
+所以在 Cursor 里对着 `solution.js` 按快捷键就能直接判当前这题。
+
+## Cursor 快捷键
+
+`.vscode/tasks.json` 已配好，键位写在你的 `keybindings.json` 里：
+
+| 快捷键 | 动作 |
+|---|---|
+| `⌘↩` | 自测 L1 官方样例 |
+| `⇧⌘↩` | 自测 L2 加边界 |
+| `⌥⌘↩` | 自测 L3 加随机对拍与性能 |
+| `⌃⌘↩` | **正式提交**（跑满 L3 + 快照 + 排复习 + push） |
+| `⇧⌘O` | 浏览器打开题面 |
+
+其余任务走 `⇧⌘P` → `Tasks: Run Task`：ACM 模式、今天做什么、新建题目、打开看板。
+
+## git 归档
+
+`algo git-setup` 会 `git init` + 用 `gh` 建 private 仓库 + 首次推送。
+之后每次 `algo submit` 自动提交这一道题的目录并推送，commit message 形如：
+
+```
+26. 删除有序数组中的重复项 · 首次 · 自评 4/5
+
+难度 Easy
+分类 array
+标签 数组 / 双指针
+快照 attempts/2026-09-18T06-46-16_first_r4_009099778c75.js
+https://leetcode.cn/problems/remove-duplicates-from-sorted-array/
+```
+
+**`data/algo.db` 不进仓库** —— 状态、掌握度、复习日期都在各题 `meta.json` 里，
+换机器 clone 下来跑 `algo sync` 就能重建整个数据库。二进制文件进 git 每次都是整文件 diff，不值当。
+
+推送失败不会影响已经落盘的提交记录，跑 `algo push` 补推。
 
 ## 目录结构
 
@@ -48,7 +127,9 @@ problems/<分类>/<题号>-<slug>/
   assets/                   题面配图
   README.md                 题面纯文本 + 路线定位 + 官方提示 + 相似题
   acm.js                    自动生成的 stdin/stdout 包装
-  tests/cases.json          官方样例（可自己加边界用例）
+  tests/cases.json          官方样例 + 题面约束（constraints）
+  tests/brute.js            暴力参考解，L2/L3 靠它对拍。不写就只验证不崩溃
+  tests/invariant.js        可选，答案不唯一时改用性质断言
   tests/checker.js          可选，compare.mode = custom 时的自定义判定
   notes.md                  你的总结，frontmatter 会被聚合
   attempts/                 每次完成的代码快照

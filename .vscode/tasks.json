@@ -2,45 +2,66 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "算法：本地判题",
+      "label": "自测 L1 官方样例",
       "type": "shell",
-      "command": "bun cli/index.js test ${fileDirname}",
+      "command": "algo test ${fileDirname}",
       "problemMatcher": [],
       "presentation": { "reveal": "always", "panel": "dedicated", "clear": true },
       "group": { "kind": "build", "isDefault": true }
     },
     {
-      "label": "算法：判题（ACM 模式）",
+      "label": "自测 L2 加边界",
       "type": "shell",
-      "command": "bun cli/index.js test ${fileDirname} --acm",
+      "command": "algo test ${fileDirname} --level 2",
       "problemMatcher": [],
       "presentation": { "reveal": "always", "panel": "dedicated", "clear": true }
     },
     {
-      "label": "算法：记为完成",
+      "label": "自测 L3 加随机对拍与性能",
       "type": "shell",
-      "command": "bun cli/index.js submit ${fileDirname}",
+      "command": "algo test ${fileDirname} --level 3",
       "problemMatcher": [],
       "presentation": { "reveal": "always", "panel": "dedicated", "clear": true }
     },
     {
-      "label": "算法：今天做什么",
+      "label": "正式提交",
       "type": "shell",
-      "command": "bun cli/index.js today",
+      "command": "algo submit ${fileDirname}",
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated", "clear": true, "focus": true }
+    },
+    {
+      "label": "自测 ACM 模式",
+      "type": "shell",
+      "command": "algo test ${fileDirname} --acm",
       "problemMatcher": [],
       "presentation": { "reveal": "always", "panel": "dedicated", "clear": true }
     },
     {
-      "label": "算法：新建题目",
+      "label": "打开题面",
       "type": "shell",
-      "command": "bun cli/index.js new ${input:problemId}",
+      "command": "algo open ${fileDirname} --doc",
+      "problemMatcher": [],
+      "presentation": { "reveal": "silent", "panel": "dedicated" }
+    },
+    {
+      "label": "今天做什么",
+      "type": "shell",
+      "command": "algo today",
       "problemMatcher": [],
       "presentation": { "reveal": "always", "panel": "dedicated", "clear": true }
     },
     {
-      "label": "算法：打开看板",
+      "label": "新建题目",
       "type": "shell",
-      "command": "bun cli/index.js web",
+      "command": "algo new ${input:problemId}",
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated", "clear": true }
+    },
+    {
+      "label": "打开看板",
+      "type": "shell",
+      "command": "algo web",
       "isBackground": true,
       "problemMatcher": [],
       "presentation": { "reveal": "always", "panel": "dedicated" }
