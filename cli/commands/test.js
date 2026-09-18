@@ -74,11 +74,19 @@ function clampLevel(raw) {
   return Math.min(3, Math.trunc(n));
 }
 
-/** 汇总所有阶段，落库并返回结论 */
+/**
+ * 汇总所有阶段，落库并返回结论。
+ *
+ * `ok` 只代表「没有判定为错的用例」，不代表判过。缺 oracle 的阶段里每条都是
+ * ok===null——把它当通过就是自欺，所以额外返回 judged / missingOracle，
+ * 让 submit 这类正式门禁能区分「真过了」和「只是没崩」。
+ */
 function summarize(meta, stages, { level = 1, totalMs = 0 } = {}) {
   const all = stages.flatMap((s) => s.results);
   const passed = all.filter((r) => r.ok === true).length;
   const failed = all.filter((r) => r.ok === false);
+  const unjudged = all.filter((r) => r.ok === null);
+  const missingOracle = stages.filter((s) => s.oracle === null).map((s) => s.stage);
 
   recordRun({
     problemId: meta.id,
@@ -90,7 +98,16 @@ function summarize(meta, stages, { level = 1, totalMs = 0 } = {}) {
     failure: failed.length ? failed.map((r) => r.name).join(', ') : null,
   });
 
-  return { ok: failed.length === 0, passed, total: all.length, stages };
+  return {
+    ok: failed.length === 0,
+    passed,
+    total: all.length,
+    judged: passed + failed.length,
+    unjudged: unjudged.length,
+    missingOracle,
+    level,
+    stages,
+  };
 }
 
 export function mustResolve(key) {

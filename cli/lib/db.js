@@ -170,3 +170,12 @@ export function countRunsSinceLastAttempt(problemId) {
     : d.prepare(sql).get(problemId);
   return row?.n ?? 0;
 }
+
+/** 最近一次 attempt，用来判断这次提交的代码是不是原封不动的重复提交 */
+export function lastAttempt(problemId) {
+  return (
+    getDb()
+      .prepare('SELECT * FROM attempts WHERE problem_id = ? ORDER BY id DESC LIMIT 1')
+      .get(problemId) ?? null
+  );
+}

@@ -3,7 +3,13 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { mustResolve } from './test.js';
 import { cmdTest } from './test.js';
-import { recordAttempt, upsertProblem, countRunsSinceLastAttempt, getReview } from '../lib/db.js';
+import {
+  recordAttempt,
+  upsertProblem,
+  countRunsSinceLastAttempt,
+  getReview,
+  lastAttempt,
+} from '../lib/db.js';
 import { schedule } from '../lib/srs.js';
 import { c, prompt } from '../lib/term.js';
 import { archiveProblem } from '../lib/git.js';
@@ -27,6 +33,19 @@ export async function cmdSubmit(args) {
       console.log(c.red('  全量自测没过。确定要记为完成就加 --skip-test。'));
       return;
     }
+    // ok 只说明「没有判错的」。缺 oracle 的阶段一条都没判过对错，
+    // 放行等于把 L3 降级成 L1——那分级自测就白做了。
+    if (verdict.missingOracle.length) {
+      console.log('');
+      console.log(c.red(`  ${verdict.unjudged} 条用例未判定对错，不能算正式通过。`));
+      console.log(c.gray(`  缺 oracle 的阶段：${verdict.missingOracle.join('、')}`));
+      console.log('');
+      console.log(`  写 ${c.bold('tests/brute.js')} 的暴力参考解，L2/L3 才有判定依据。`);
+      console.log(c.gray('  答案不唯一的题改写 tests/invariant.js 断言性质。'));
+      console.log(c.gray('  就是要跳过：algo submit --skip-test。'));
+      console.log('');
+      return;
+    }
   }
 
   const solutionPath = path.join(meta.dir, 'solution.js');
@@ -37,11 +56,25 @@ export async function cmdSubmit(args) {
   const rating = Number(
     args.rating ?? (await prompt(`${c.bold('自评掌握度')} ${c.gray('0=瞎蒙 5=秒杀')} [0-5] `)),
   );
-  if (Number.isNaN(rating) || rating < 0 || rating > 5) {
+  if (!Number.isInteger(rating) || rating < 0 || rating > 5) {
     throw new Error('掌握度必须是 0-5 的整数');
   }
   const minutes = args.minutes ? Number(args.minutes) : null;
-  const mode = args.mode ?? (getReview(meta.id) ? 'rewrite' : 'first');
+
+  // 代码一个字没变的重复提交不是一次新的完成。放行的话，误操作重跑一次
+  // submit 就能把复习间隔往后推一档，这题会直接从复习队列里消失。
+  const prev = lastAttempt(meta.id);
+  const duplicate = prev?.code_sha === sha;
+  if (duplicate && !args.force) {
+    console.log('');
+    console.log(c.yellow(`  这份代码和上次提交完全一样（${sha}），不记为新的一次完成。`));
+    console.log(c.gray(`  上次 ${prev.submitted_at.slice(0, 16).replace('T', ' ')} · ${prev.mode} · 自评 ${prev.self_rating}/5`));
+    console.log(c.gray('  复习请走 algo review；真要重复记一次加 --force。'));
+    console.log('');
+    return;
+  }
+
+  const mode = args.mode ?? (prev ? 'rewrite' : 'first');
 
   // 代码快照：每次完成留一份，复习时可以 diff 看自己写法的演化
   const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
@@ -72,7 +105,10 @@ export async function cmdSubmit(args) {
     quality: rating,
   });
 
-  meta.status = rating >= 4 ? 'mastered' : rating >= 3 ? 'solved' : 'shaky';
+  // mastered 不能只凭一次自评。第一次做完就说「掌握了」是没有依据的——
+  // 真正的证据是隔几天回来还能重新写出来，所以要求至少经历 2 轮。
+  meta.status =
+    rating >= 4 && srs.reps >= 2 ? 'mastered' : rating >= 3 ? 'solved' : 'shaky';
   meta.mastery = rating;
   meta.lastDoneAt = new Date().toISOString().slice(0, 10);
   fs.writeFileSync(path.join(meta.dir, 'meta.json'), JSON.stringify(stripDir(meta), null, 2) + '\n');
@@ -81,7 +117,18 @@ export async function cmdSubmit(args) {
   console.log('');
   console.log(`  ${c.green('已记录')} ${meta.id}. ${meta.title}  自评 ${rating}/5`);
   console.log(c.gray(`  代码快照 attempts/${path.basename(snapPath)}`));
-  console.log(c.gray(`  这次提交前本地跑了 ${localRuns} 遍`));
+  if (localRuns === 0) {
+    console.log(
+      c.yellow(`  这题本地一遍都没跑过就记成完成了——力扣过了不代表你的边界情况都想清楚了。`),
+    );
+  } else {
+    console.log(c.gray(`  这次提交前本地跑了 ${localRuns} 遍`));
+  }
+  if (rating >= 4 && srs.reps < 2) {
+    console.log(
+      c.gray(`  自评 ${rating} 但只做过 ${srs.reps} 轮，先记 solved；复习一轮还能写出来才算 mastered。`),
+    );
+  }
   if (!notes.pattern) {
     console.log(
       c.yellow(`  notes.md 的 pattern 还空着——不写清用了哪个模板，复习时没法聚合。`),
