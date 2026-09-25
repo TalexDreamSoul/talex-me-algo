@@ -41,7 +41,21 @@ function resolveWorkspace() {
   return path.join(os.homedir(), '.algo');
 }
 
-export const ROOT = resolveWorkspace();
+/**
+ * 路径统一走一次 realpath。
+ *
+ * macOS 上 /tmp、/var 都是软链，工作区落在那种地方时，
+ * 「/tmp/ws」和「/private/tmp/ws」会被 git 当成两个不同的仓库而拒绝操作。
+ */
+function realpath(dir) {
+  try {
+    return fs.realpathSync(dir);
+  } catch {
+    return dir; // 目录还没建出来（比如兜底的 ~/.algo），保持原样
+  }
+}
+
+export const ROOT = realpath(resolveWorkspace());
 export const DATA_DIR = path.join(ROOT, 'data');
 export const PROBLEMS_DIR = path.join(ROOT, 'problems');
 export const ROADMAP_FILE = path.join(PKG_ROOT, 'data', 'roadmap.json');
