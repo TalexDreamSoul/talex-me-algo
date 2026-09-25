@@ -11,6 +11,7 @@
  */
 
 import { lenOf, valOf } from './constraints.js';
+import { NaryNode, naryTreeToArray } from './structs.js';
 
 /** xorshift32：种子固定 -> 序列可复现，失败能原样重跑 */
 export function rngFrom(seed) {
@@ -118,6 +119,9 @@ function genParam(type, name, ctx) {
       return type === 'TreeNode'
         ? randomTreeArray(rnd, n, valB)
         : Array.from({ length: n }, () => randInt(rnd, valB.min, valB.max));
+    case 'NaryNode':
+      // wire format 同样是数组，null 表示「上一个节点的孩子列表到此为止」
+      return randomNaryArray(rnd, n, valB);
     default:
       return Array.from({ length: n }, () => randInt(rnd, valB.min, valB.max));
   }
@@ -139,6 +143,33 @@ function randomTreeArray(rnd, n, valB) {
 }
 
 /**
+ * 随机多叉树的层序数组表示。
+ *
+ * 先按 BFS 长出树，再用 naryTreeToArray 序列化——手写 null 位置很容易错一格，
+ * 走真实序列化保证生成出来的 wire format 一定能被 buildNaryTree 解回同一棵树。
+ */
+function randomNaryArray(rnd, n, valB) {
+  if (n <= 0) return [];
+  const pick = () => randInt(rnd, valB.min, valB.max);
+  const root = new NaryNode(pick());
+  const queue = [root];
+  let count = 1;
+  while (count < n && queue.length) {
+    const parent = queue.shift();
+    // 根至少分一个孩子，否则 n > 1 时会退化成「只有根」
+    const lo = count === 1 && n > 1 ? 1 : 0;
+    const kids = Math.min(randInt(rnd, lo, 3), n - count);
+    for (let i = 0; i < kids; i++) {
+      const child = new NaryNode(pick());
+      parent.children.push(child);
+      queue.push(child);
+      count++;
+    }
+  }
+  return naryTreeToArray(root);
+}
+
+/**
  * L2 边界用例：按参数类型枚举最容易写错的形状。
  *
  * 不是随机——每一条都对应一类真实 bug：
@@ -153,7 +184,7 @@ export function boundaryCases(plan, cons, flags) {
   const rnd = rngFrom(0x51ed270b);
   const shapes = [];
 
-  const primary = plan.paramTypes.findIndex((t) => /\[\]$|ListNode|TreeNode|string/.test(t));
+  const primary = plan.paramTypes.findIndex((t) => /\[\]$|ListNode|TreeNode|NaryNode|string/.test(t));
   if (primary === -1) return [];
 
   const name = plan.paramNames[primary];
@@ -206,6 +237,31 @@ export function boundaryCases(plan, cons, flags) {
     });
   }
 
+  if (type === 'NaryNode') {
+    const v = (i) => clampInt(valB.min + i, valB.min, valB.max);
+    const node = (val, children = []) => new NaryNode(val, children);
+    // 「空输入」和「单元素」两条通用形状对多叉树就是空树和只有根，这里不重复生成
+    shapes.push({
+      name: '根挂三个孩子',
+      value: naryTreeToArray(node(v(0), [node(v(1)), node(v(2)), node(v(3))])),
+      size: 4,
+    });
+    shapes.push({
+      name: '宽扁（根挂八个）',
+      value: naryTreeToArray(node(v(0), Array.from({ length: 8 }, (_, i) => node(v(i + 1))))),
+      size: 9,
+    });
+    // 深而不宽：每层一个孩子，最容易漏掉「只往下走」的那条分支
+    let deep = node(v(4));
+    for (let i = 3; i >= 0; i--) deep = node(v(i), [deep]);
+    shapes.push({ name: '单链（深度 5）', value: naryTreeToArray(deep), size: 5 });
+    shapes.push({
+      name: '取值边界',
+      value: naryTreeToArray(node(valB.max, [node(valB.min), node(0)])),
+      size: 3,
+    });
+  }
+
   if (type === 'string') {
     const alpha = flags.includes('binary') ? '01' : flags.includes('lowercase') ? 'abc' : 'abAB1 ';
     shapes.push({ name: '全同字符', value: alpha[0].repeat(5), size: 5 });
@@ -246,7 +302,7 @@ export function randomCases(plan, cons, flags, { count = 30, seed = 0xc0ffee } =
  */
 export function perfCase(plan, cons, flags, { cap = 100000 } = {}) {
   if (plan.kind === 'design') return null;
-  const primary = plan.paramTypes.findIndex((t) => /\[\]$|ListNode|TreeNode|string/.test(t));
+  const primary = plan.paramTypes.findIndex((t) => /\[\]$|ListNode|TreeNode|NaryNode|string/.test(t));
   if (primary === -1) return null;
 
   const name = plan.paramNames[primary];

@@ -14,7 +14,9 @@ export const c = {
   blue: wrap('34'),
   magenta: wrap('35'),
   cyan: wrap('36'),
-  gray: wrap('90'),
+  // 原来用 90（bright black），在浅色主题下会被映射成极浅的灰，几乎看不清；
+  // 换成 256 色固定中灰（#767676），深浅背景都可读
+  gray: wrap('38;5;243'),
 };
 
 export const DIFF_COLOR = {
