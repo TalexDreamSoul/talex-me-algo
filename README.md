@@ -1,8 +1,30 @@
 # talex-me-algo
 
-个人算法刷题工作台。labuladong 速成路线驱动 + 力扣抓题 + 分级自测 + 间隔复习 + 聚合看板。
-解法一律 **JavaScript**，写完可原样粘贴到力扣提交。
-每次正式提交自动 commit + push 到 GitHub private 仓库。
+算法刷题工作台：labuladong 速成路线驱动 + 力扣抓题 + 本地分级判题 + 间隔复习 + 聚合看板。
+解法一律 **JavaScript**，写完可原样粘贴到力扣提交。需要 [Bun](https://bun.sh) ≥ 1.3。
+
+## 安装
+
+```bash
+bun i -g talex-me-algo     # 或 npm i -g talex-me-algo
+algo                       # 打出命令列表就装好了
+```
+
+**代码和你的数据是分开的。** 包（`cli/` + `web-dist/` + 路线数据）装在全局，
+你的题目、笔记、判题记录落在**工作区**——按这个顺序找：
+
+1. `$ALGO_HOME` —— 显式指定
+2. 当前目录往上找带 `problems/` 或 `.algo` 的目录（像 git 找 `.git`）
+3. `~/.algo` —— 兜底，首次使用时自动建
+
+典型用法：
+
+```bash
+mkdir -p ~/algo && cd ~/algo     # 建你的刷题区
+algo new 26                      # 题目落在 ./problems/，可以整个目录 git init
+```
+
+升级包不会碰你的工作区；换机器把工作区目录拷过去、跑一次 `algo sync` 就能重建数据库。
 
 ## 日常流程
 
@@ -18,8 +40,9 @@ algo submit 26              # 正式提交：默认跑满 L3，快照代码，�
 algo web                    # 打开看板
 ```
 
-建议做个 alias：`alias algo='bun ~/Workspace/Projects/talex-me-algo/cli/index.js'`，
-或直接软链到 PATH：`ln -sf "$PWD/cli/index.js" ~/.bun/bin/algo`。
+`algo git-setup` 会在你的工作区建 GitHub private 仓库并接上自动提交——
+刷题记录是你的，默认私有；这个工具仓库本身开源。
+
 
 ## 自测 vs 正式提交
 

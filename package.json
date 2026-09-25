@@ -36,7 +36,8 @@
   ],
   "scripts": {
     "algo": "bun cli/index.js",
-    "build:web": "vite build"
+    "build:web": "vite build",
+    "prepublishOnly": "vite build"
   },
   "devDependencies": {
     "@iconify-json/carbon": "^1.2.27",
