@@ -1,11 +1,50 @@
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import fs from 'node:fs';
+import os from 'node:os';
 
-export const ROOT = path.resolve(fileURLToPath(import.meta.url), '../../..');
+/**
+ * 包自身目录。随包分发的**只读资产**（roadmap.json、web-dist）都从这里找，
+ * 这样全局安装后 CLI 也认得出自己的家在哪。
+ */
+export const PKG_ROOT = path.resolve(fileURLToPath(import.meta.url), '../../..');
+
+/**
+ * 用户工作区。problems/ 和 data/algo.db 这种**会写、属于你个人**的东西落在这里。
+ *
+ * 为什么不能直接用包目录：`npm i -g` 装完，包在 node_modules 里，
+ * 往那儿写题目等于往只读的安装目录里塞个人数据，升级一次全没。
+ *
+ * 解析顺序：
+ *   1. $ALGO_HOME —— 显式指定，最优先
+ *   2. 包目录自己带 problems/ —— 把工具仓库直接当工作区用（本仓库的开发/自用形态）
+ *   3. 从 cwd 向上找带 problems/ 或 .algo 的目录 —— 像 git 找 .git
+ *   4. ~/.algo —— 兜底，首次使用时自动建出来
+ */
+function resolveWorkspace() {
+  const explicit = process.env.ALGO_HOME;
+  if (explicit) return path.resolve(explicit);
+
+  const looksLikeWorkspace = (dir) =>
+    fs.existsSync(path.join(dir, 'problems')) || fs.existsSync(path.join(dir, '.algo'));
+
+  if (looksLikeWorkspace(PKG_ROOT)) return PKG_ROOT;
+
+  let dir = process.cwd();
+  for (;;) {
+    if (looksLikeWorkspace(dir)) return dir;
+    const up = path.dirname(dir);
+    if (up === dir) break;
+    dir = up;
+  }
+
+  return path.join(os.homedir(), '.algo');
+}
+
+export const ROOT = resolveWorkspace();
 export const DATA_DIR = path.join(ROOT, 'data');
 export const PROBLEMS_DIR = path.join(ROOT, 'problems');
-export const ROADMAP_FILE = path.join(DATA_DIR, 'roadmap.json');
+export const ROADMAP_FILE = path.join(PKG_ROOT, 'data', 'roadmap.json');
 export const DB_FILE = path.join(DATA_DIR, 'algo.db');
 
 let roadmapCache = null;

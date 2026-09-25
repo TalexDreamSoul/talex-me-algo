@@ -1,28 +1,50 @@
 {
   "name": "talex-me-algo",
   "version": "1.0.0",
-  "private": true,
+  "description": "算法刷题工作台：labuladong 路线驱动 + 力扣抓题 + 本地分级判题 + 间隔复习 + 聚合看板",
   "type": "module",
-  "description": "个人算法刷题工作台：labuladong 路线驱动 + 力扣抓题 + 本地判题 + 间隔复习 + 聚合看板",
   "bin": {
     "algo": "./cli/index.js"
   },
-  "scripts": {
-    "algo": "bun cli/index.js",
-    "web": "bun cli/index.js web"
-  },
+  "files": [
+    "cli/",
+    "data/roadmap.json",
+    "web-dist/",
+    "README.md",
+    "LICENSE"
+  ],
   "engines": {
     "bun": ">=1.3.0"
   },
+  "license": "MIT",
+  "author": "TalexDreamSoul",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/TalexDreamSoul/talex-me-algo.git"
+  },
+  "homepage": "https://github.com/TalexDreamSoul/talex-me-algo#readme",
+  "bugs": {
+    "url": "https://github.com/TalexDreamSoul/talex-me-algo/issues"
+  },
+  "keywords": [
+    "leetcode",
+    "algorithm",
+    "spaced-repetition",
+    "cli",
+    "labuladong",
+    "practice"
+  ],
+  "scripts": {
+    "algo": "bun cli/index.js",
+    "build:web": "vite build"
+  },
   "devDependencies": {
     "@iconify-json/carbon": "^1.2.27",
+    "@talex-touch/tuffex": "^0.6.0",
     "@unocss/preset-icons": "^66.10.5",
     "@vitejs/plugin-vue": "^6.0.9",
     "unocss": "^66.10.5",
-    "vite": "^8.3.0"
-  },
-  "dependencies": {
-    "@talex-touch/tuffex": "^0.6.0",
+    "vite": "^8.3.0",
     "vue": "^3.5.43"
   }
 }

@@ -57,6 +57,16 @@ export async function archiveProblem(meta, info) {
   if (!state.inited) return { ok: false, step: 'init', message: '还没 git init，跑 algo git-setup' };
 
   const rel = path.relative(ROOT, meta.dir);
+  // 开源后的工具仓库一般把 problems/ 排除在版本控制外（那是个人数据）；
+  // 被 ignore 就直接跳过归档，别拿一条 add 失败去烦人
+  const ignored = await git(['check-ignore', '--quiet', '--', rel]);
+  if (ignored.ok) {
+    return {
+      ok: true,
+      step: 'ignored',
+      message: '题目目录被 .gitignore 排除（个人数据不进工具仓库），跳过归档',
+    };
+  }
   const add = await git(['add', '--', rel]);
   if (!add.ok) return { ok: false, step: 'add', message: add.stderr };
 

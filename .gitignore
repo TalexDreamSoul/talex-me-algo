@@ -1,13 +1,17 @@
 node_modules/
 web-dist/
 
+# 刷题记录属于个人数据，不进这个工具仓库。
+# 仓库开源的是工具本体（cli/ + web/ + 路线数据），你的解法、笔记、attempts 快照不进版本控制。
+problems/
+
 # sqlite 是派生数据：状态/掌握度/复习日期都在各题 meta.json 里，
 # algo sync 能从磁盘完整重建。二进制文件进 git 每次都是整文件 diff，不值当。
 data/algo.db
 data/algo.db-shm
 data/algo.db-wal
 
-# 复习「重写」模式掏空 solution.js 前的临时备份，不是成果
-problems/**/attempts/.before-*.js
-
 .DS_Store
+
+# 本地 agent 配置（omp skills / settings），不入库
+/.omp/

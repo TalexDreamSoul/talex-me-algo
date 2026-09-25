@@ -1,15 +1,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { getDb, upsertProblem } from '../lib/db.js';
 import { schedule } from '../lib/srs.js';
-import { roadmap, listProblems, resolveProblem, todayISO } from '../lib/paths.js';
+import { PKG_ROOT, roadmap, listProblems, resolveProblem, todayISO } from '../lib/paths.js';
 import { readNotes } from './submit.js';
 import { openBrowser, openInCursor } from '../lib/editor.js';
 import { c } from '../lib/term.js';
 
-const ROOT_DIR = path.resolve(fileURLToPath(import.meta.url), '../../..');
-const DIST_DIR = path.join(ROOT_DIR, 'web-dist');
+const DIST_DIR = path.join(PKG_ROOT, 'web-dist');
 
 /**
  * algo web [--port 5177] [--no-open]
@@ -21,7 +19,7 @@ export async function cmdWeb(args) {
   // 看板是 Vue + TuffEx 应用，必须先有产物。缺了或比源码旧就自动构建一次。
   if (args.build || needsBuild()) {
     console.log(c.gray('  正在构建看板…'));
-    const proc = Bun.spawn(['bunx', 'vite', 'build'], { cwd: ROOT_DIR, stdout: 'pipe', stderr: 'pipe' });
+    const proc = Bun.spawn(['bunx', 'vite', 'build'], { cwd: PKG_ROOT, stdout: 'pipe', stderr: 'pipe' });
     const code = await proc.exited;
     if (code !== 0) {
       throw new Error(`看板构建失败：\n${await new Response(proc.stderr).text()}`);
@@ -46,8 +44,10 @@ export async function cmdWeb(args) {
 function needsBuild() {
   const entry = path.join(DIST_DIR, 'index.html');
   if (!fs.existsSync(entry)) return true;
+  // 全局安装的包里只有预构建产物、没有 web/ 源码，这种时候不需要（也没法）重建
+  const srcDir = path.join(PKG_ROOT, 'web');
+  if (!fs.existsSync(srcDir)) return false;
   const builtAt = fs.statSync(entry).mtimeMs;
-  const srcDir = path.join(ROOT_DIR, 'web');
   const walk = (dir) =>
     fs.readdirSync(dir, { withFileTypes: true }).some((e) => {
       const full = path.join(dir, e.name);

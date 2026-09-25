@@ -4,12 +4,22 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 import { fetchQuestion, slugFromId, extractExamples, stripHtml } from './leetcode.js';
 import { planFromMeta, splitExampleTestcases } from './codec.js';
 import { guessCompareMode } from './compare.js';
 import { parseConstraints } from './constraints.js';
 import { roadmap, findRoadmapProblem, problemDir, ensureDir, todayISO } from './paths.js';
+
+/**
+ * 本包 cli/lib 的绝对路径。
+ *
+ * 生成的 acm.js 要 import 这份运行库，而题目目录在**用户工作区**里、
+ * 跟包不一定同源（全局安装时两者隔着十万八千里），所以不能写相对路径——
+ * 直接把生成这一刻的库位置写死进去。
+ */
+const LIB_DIR = fileURLToPath(new URL('./', import.meta.url));
 
 /**
  * @param {string} key 题号或 slug
@@ -461,8 +471,8 @@ function renderAcm(problem, plan) {
  * 用法：echo '["${plan.classname}","..."]\\n[[...],[...]]' | node acm.js
  */
 import { ${plan.classname} } from './solution.js';
-import { readStdin } from '../../../cli/lib/acm-runtime.js';
-import { runDesign } from '../../../cli/lib/runner.js';
+import { readStdin } from '${LIB_DIR}acm-runtime.js';
+import { runDesign } from '${LIB_DIR}runner.js';
 
 const [opsLine, argsLine] = (await readStdin()).split('\\n');
 const ops = JSON.parse(opsLine);
@@ -478,8 +488,8 @@ console.log(JSON.stringify(runDesign(${plan.classname}, ops, args)));
  * 用法：printf '%s\\n' '[2,7,11,15]' '9' | node acm.js
  */
 import { ${plan.name} } from './solution.js';
-import { readStdin } from '../../../cli/lib/acm-runtime.js';
-import { decodeArgs, encodeResult, parseArgLine } from '../../../cli/lib/codec.js';
+import { readStdin } from '${LIB_DIR}acm-runtime.js';
+import { decodeArgs, encodeResult, parseArgLine } from '${LIB_DIR}codec.js';
 
 const PARAM_TYPES = [
 ${decodeLines}
