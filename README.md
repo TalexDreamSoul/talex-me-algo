@@ -50,6 +50,11 @@ export function removeDuplicates(nums) {
 
 没写的话 L2/L3 会明说「缺 oracle，只验证了不崩溃」，**不会假装通过**。
 
+**什么时候写**：等你在力扣 AC 掉之后再写（或让 agent 写）。提前生成等于把一份能跑通的
+参考实现摆在你面前——这条时机约束写在 [`AGENTS.md`](AGENTS.md)。
+生成时必须走和主解**不同的实现路径**（递归配迭代，反之亦然），
+否则两边错在同一处时，对拍会给你假绿灯。
+
 答案不唯一的题（「返回任意一个合法解」）改写 `tests/invariant.js`，
 导出 `check(actual, input)` 断言性质而不是比对具体值。
 
